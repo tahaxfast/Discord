@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Discord Clone - Auth</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  body {
+    background: linear-gradient(135deg, #5865f2, #7289da, #23272a);
+    height: 100vh; display: flex; justify-content: center; align-items: center;
+  }
+  .auth-box {
+    background: #36393f; padding: 35px; border-radius: 8px;
+    width: 400px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  }
+  .auth-box h1 { color: #fff; text-align: center; margin-bottom: 8px; font-size: 24px; }
+  .auth-box p { color: #b9bbbe; text-align: center; margin-bottom: 25px; font-size: 14px; }
+  .auth-box label {
+    display: block; color: #b9bbbe; font-size: 12px;
+    margin-bottom: 6px; font-weight: 700; text-transform: uppercase;
+  }
+  .auth-box input {
+    width: 100%; padding: 11px; margin-bottom: 18px;
+    background: #202225; border: 1px solid #202225; border-radius: 4px;
+    color: #dcddde; font-size: 15px; outline: none;
+  }
+  .auth-box input:focus { border-color: #7289da; }
+  .auth-box button {
+    width: 100%; padding: 12px; background: #5865f2; color: #fff;
+    border: none; border-radius: 4px; font-size: 16px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .auth-box button:hover { background: #4752c4; }
+  .auth-box button:disabled { background: #4752c4; opacity: 0.6; cursor: not-allowed; }
+  .auth-switch { text-align: center; margin-top: 15px; font-size: 14px; color: #b9bbbe; }
+  .auth-switch a { color: #00a8fc; cursor: pointer; text-decoration: none; }
+  .auth-switch a:hover { text-decoration: underline; }
+  #status {
+    text-align: center; margin-top: 15px; font-size: 13px; color: #faa61a;
+  }
+
+  /* صفحه چت (ساده) */
+  #chatPage { display: none; height: 100vh; width: 100%; background: #36393f; }
+  .chat-header {
+    height: 50px; background: #2f3136; display: flex; align-items: center;
+    padding: 0 20px; color: #fff; justify-content: space-between;
+  }
+  .chat-header button {
+    background: #ed4245; color: #fff; border: none; padding: 6px 12px;
+    border-radius: 4px; cursor: pointer; font-size: 13px;
+  }
+  .messages { padding: 20px; height: calc(100vh - 120px); overflow-y: auto; }
+  .message { margin-bottom: 15px; color: #dcddde; }
+  .message .user { color: #fff; font-weight: bold; }
+  .input-area {
+    height: 70px; display: flex; align-items: center;
+    padding: 0 20px; background: #36393f;
+  }
+  .input-area input {
+    flex: 1; padding: 12px; background: #40444b; border: none;
+    border-radius: 8px; color: #dcddde; font-size: 15px; outline: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ صفحه ثبت‌نام / ورود ============ -->
+<div id="authPage">
+  <div class="auth-box">
+    <h1 id="authTitle">ساخت حساب جدید</h1>
+    <p id="authSub">با GunDB SEA امن ثبت‌نام کن</p>
+
+    <label>نام کاربری</label>
+    <input type="text" id="usernameInput" placeholder="ali">
+
+    <label>رمز عبور</label>
+    <input type="password" id="passwordInput" placeholder="حداقل ۶ حرف">
+
+    <button onclick="handleAuth()" id="authBtn">ثبت‌نام</button>
+
+    <div class="auth-switch">
+      <span id="switchText">حساب داری؟ </span>
+      <a onclick="toggleAuth()" id="switchLink">ورود</a>
+    </div>
+
+    <div id="status"></div>
+  </div>
+</div>
+
+<!-- ============ صفحه چت (موقت) ============ -->
+<div id="chatPage">
+  <div class="chat-header">
+    <span>🟢 چت عمومی</span>
+    <button onclick="logout()">خروج</button>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <input type="text" id="msgInput" placeholder="پیامت رو بنویس..." onkeydown="if(event.key==='Enter') sendMsg()">
+  </div>
+</div>
+
+<!-- ============ GunDB ============ -->
+<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+<script>
+// ================== راه‌اندازی GunDB ==================
+// اتصال به رله‌های عمومی GunDB
+const gun = Gun([
+  'https://gun-manhattan.herokuapp.com/gun',
+  'https://gun-us.herokuapp.com/gun'
+]);
+
+// کاربر فعلی
+const user = gun.user();
+
+// ================== وضعیت ==================
+let isRegisterMode = true;
+
+// ================== تغییر حالت ==================
+function toggleAuth() {
+  isRegisterMode = !isRegisterMode;
+  document.getElementById('authTitle').textContent = isRegisterMode ? 'ساخت حساب جدید' : 'خوش اومدی!';
+  document.getElementById('authSub').textContent = isRegisterMode ? 'با GunDB SEA امن ثبت‌نام کن' : 'وارد حساب GunDB خودت شو';
+  document.getElementById('authBtn').textContent = isRegisterMode ? 'ثبت‌نام' : 'ورود';
+  document.getElementById('switchText').textContent = isRegisterMode ? 'حساب داری؟ ' : 'حساب نداری؟ ';
+  document.getElementById('switchLink').textContent = isRegisterMode ? 'ورود' : 'ثبت‌نام';
+}
+
+// ================== ثبت‌نام / ورود ==================
+function handleAuth() {
+  const username = document.getElementById('usernameInput').value.trim();
+  const password = document.getElementById('passwordInput').value.trim();
+  const status = document.getElementById('status');
+  const btn = document.getElementById('authBtn');
+
+  if (!username || !password) {
+    status.textContent = '⚠️ نام کاربری و رمز عبور رو وارد کن!';
+    return;
+  }
+  if (password.length < 6) {
+    status.textContent = '⚠️ رمز باید حداقل ۶ حرف باشه!';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = '⏳ در حال پردازش...';
+
+  if (isRegisterMode) {
+    // ثبت‌نام
+    user.create(username, password, (ack) => {
+      btn.disabled = false;
+      if (ack.err) {
+        status.textContent = '❌ ' + ack.err;
+      } else {
+        status.textContent = '✅ ثبت‌نام موفق! حالا وارد شو.';
+        // بعد از ثبت‌نام، خودکار وارد شو
+        user.auth(username, password, (authAck) => {
+          if (!authAck.err) showChat();
+        });
+      }
+    });
+  } else {
+    // ورود
+    user.auth(username, password, (ack) => {
+      btn.disabled = false;
+      if (ack.err) {
+        status.textContent = '❌ ' + ack.err;
+      } else {
+        showChat();
+      }
+    });
+  }
+}
+
+// ================== نمایش چت ==================
+function showChat() {
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('chatPage').style.display = 'block';
+  loadMessages();
+
+  // گوش دادن به پیام‌های جدید
+  gun.get('public-chat').map().on((msg, id) => {
+    if (!msg || !msg.text) return;
+    renderMessage(msg);
+  });
+}
+
+// ================== ارسال پیام ==================
+function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const username = user.is.alias || 'ناشناس';
+
+  // ذخیره در GunDB
+  gun.get('public-chat').set({
+    user: username,
+    text: text,
+    time: Date.now()
+  });
+
+  input.value = '';
+}
+
+// ================== نمایش پیام ==================
+let renderedIds = new Set();
+
+function renderMessage(msg) {
+  const box = document.getElementById('messages');
+  const key = msg.time + '_' + msg.user;
+
+  if (renderedIds.has(key)) return;
+  renderedIds.add(key);
+
+  const div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML = `
+    <span class="user">${msg.user}</span>
+    <span style="color:#72767d;font-size:12px;margin-right:8px;">
+      ${new Date(msg.time).toLocaleTimeString('fa-IR')}
+    </span>
+    <div>${escapeHtml(msg.text)}</div>
+  `;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ================== بارگذاری پیام‌های قبلی ==================
+function loadMessages() {
+  document.getElementById('messages').innerHTML = '';
+  renderedIds.clear();
+}
+
+// ================== خروج ==================
+function logout() {
+  user.leave();
+  location.reload();
+}
+
+// ================== ابزار ==================
+function escapeHtml(t) {
+  const d = document.createElement('div');
+  d.textContent = t;
+  return d.innerHTML;
+}
+
+// ================== بررسی ورود خودکار ==================
+user.recall({ sessionStorage: true }, () => {
+  if (user.is) {
+    showChat();
+  }
+});
+</script>
+</body>
+</html>
