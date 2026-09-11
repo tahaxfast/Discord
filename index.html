@@ -1,122 +1,15 @@
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>Discord Clone - Auth</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
-  body {
-    background: linear-gradient(135deg, #5865f2, #7289da, #23272a);
-    height: 100vh; display: flex; justify-content: center; align-items: center;
-  }
-  .auth-box {
-    background: #36393f; padding: 35px; border-radius: 8px;
-    width: 400px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-  }
-  .auth-box h1 { color: #fff; text-align: center; margin-bottom: 8px; font-size: 24px; }
-  .auth-box p { color: #b9bbbe; text-align: center; margin-bottom: 25px; font-size: 14px; }
-  .auth-box label {
-    display: block; color: #b9bbbe; font-size: 12px;
-    margin-bottom: 6px; font-weight: 700; text-transform: uppercase;
-  }
-  .auth-box input {
-    width: 100%; padding: 11px; margin-bottom: 18px;
-    background: #202225; border: 1px solid #202225; border-radius: 4px;
-    color: #dcddde; font-size: 15px; outline: none;
-  }
-  .auth-box input:focus { border-color: #7289da; }
-  .auth-box button {
-    width: 100%; padding: 12px; background: #5865f2; color: #fff;
-    border: none; border-radius: 4px; font-size: 16px; font-weight: 600;
-    cursor: pointer; transition: background 0.2s;
-  }
-  .auth-box button:hover { background: #4752c4; }
-  .auth-box button:disabled { background: #4752c4; opacity: 0.6; cursor: not-allowed; }
-  .auth-switch { text-align: center; margin-top: 15px; font-size: 14px; color: #b9bbbe; }
-  .auth-switch a { color: #00a8fc; cursor: pointer; text-decoration: none; }
-  .auth-switch a:hover { text-decoration: underline; }
-  #status {
-    text-align: center; margin-top: 15px; font-size: 13px; color: #faa61a;
-  }
-
-  /* صفحه چت (ساده) */
-  #chatPage { display: none; height: 100vh; width: 100%; background: #36393f; }
-  .chat-header {
-    height: 50px; background: #2f3136; display: flex; align-items: center;
-    padding: 0 20px; color: #fff; justify-content: space-between;
-  }
-  .chat-header button {
-    background: #ed4245; color: #fff; border: none; padding: 6px 12px;
-    border-radius: 4px; cursor: pointer; font-size: 13px;
-  }
-  .messages { padding: 20px; height: calc(100vh - 120px); overflow-y: auto; }
-  .message { margin-bottom: 15px; color: #dcddde; }
-  .message .user { color: #fff; font-weight: bold; }
-  .input-area {
-    height: 70px; display: flex; align-items: center;
-    padding: 0 20px; background: #36393f;
-  }
-  .input-area input {
-    flex: 1; padding: 12px; background: #40444b; border: none;
-    border-radius: 8px; color: #dcddde; font-size: 15px; outline: none;
-  }
-</style>
-</head>
-<body>
-
-<!-- ============ صفحه ثبت‌نام / ورود ============ -->
-<div id="authPage">
-  <div class="auth-box">
-    <h1 id="authTitle">ساخت حساب جدید</h1>
-    <p id="authSub">با GunDB SEA امن ثبت‌نام کن</p>
-
-    <label>نام کاربری</label>
-    <input type="text" id="usernameInput" placeholder="ali">
-
-    <label>رمز عبور</label>
-    <input type="password" id="passwordInput" placeholder="حداقل ۶ حرف">
-
-    <button onclick="handleAuth()" id="authBtn">ثبت‌نام</button>
-
-    <div class="auth-switch">
-      <span id="switchText">حساب داری؟ </span>
-      <a onclick="toggleAuth()" id="switchLink">ورود</a>
-    </div>
-
-    <div id="status"></div>
-  </div>
-</div>
-
-<!-- ============ صفحه چت (موقت) ============ -->
-<div id="chatPage">
-  <div class="chat-header">
-    <span>🟢 چت عمومی</span>
-    <button onclick="logout()">خروج</button>
-  </div>
-  <div class="messages" id="messages"></div>
-  <div class="input-area">
-    <input type="text" id="msgInput" placeholder="پیامت رو بنویس..." onkeydown="if(event.key==='Enter') sendMsg()">
-  </div>
-</div>
-
-<!-- ============ GunDB ============ -->
-<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
 <script>
-// ================== راه‌اندازی GunDB ==================
-// اتصال به رله‌های عمومی GunDB
 const gun = Gun([
   'https://gun-manhattan.herokuapp.com/gun',
   'https://gun-us.herokuapp.com/gun'
 ]);
-
-// کاربر فعلی
 const user = gun.user();
-
-// ================== وضعیت ==================
 let isRegisterMode = true;
+let currentChannel = 'عمومی';
+let currentProfileUser = null;
+let renderedIds = new Set();
+const BLUE_TICK = 'https://cdn.imgurl.ir/uploads/n758648_ChatGPT_Image_Sep_11_2026_04_50_08_PM.png';
 
-// ================== تغییر حالت ==================
 function toggleAuth() {
   isRegisterMode = !isRegisterMode;
   document.getElementById('authTitle').textContent = isRegisterMode ? 'ساخت حساب جدید' : 'خوش اومدی!';
@@ -126,131 +19,291 @@ function toggleAuth() {
   document.getElementById('switchLink').textContent = isRegisterMode ? 'ورود' : 'ثبت‌نام';
 }
 
-// ================== ثبت‌نام / ورود ==================
 function handleAuth() {
   const username = document.getElementById('usernameInput').value.trim();
   const password = document.getElementById('passwordInput').value.trim();
   const status = document.getElementById('status');
   const btn = document.getElementById('authBtn');
-
-  if (!username || !password) {
-    status.textContent = '⚠️ نام کاربری و رمز عبور رو وارد کن!';
-    return;
-  }
-  if (password.length < 6) {
-    status.textContent = '⚠️ رمز باید حداقل ۶ حرف باشه!';
-    return;
-  }
-
+  if (!username || !password) return status.textContent = '⚠️ نام کاربری و رمز رو وارد کن!';
+  if (password.length < 6) return status.textContent = '⚠️ رمز باید حداقل ۶ حرف باشه!';
   btn.disabled = true;
   status.textContent = '⏳ در حال پردازش...';
-
   if (isRegisterMode) {
-    // ثبت‌نام
     user.create(username, password, (ack) => {
       btn.disabled = false;
-      if (ack.err) {
-        status.textContent = '❌ ' + ack.err;
-      } else {
-        status.textContent = '✅ ثبت‌نام موفق! حالا وارد شو.';
-        // بعد از ثبت‌نام، خودکار وارد شو
-        user.auth(username, password, (authAck) => {
-          if (!authAck.err) showChat();
-        });
-      }
+      if (ack.err) return status.textContent = '❌ ' + ack.err;
+      status.textContent = '✅ ثبت‌نام موفق!';
+      user.auth(username, password, (a) => {
+        if (!a.err) {
+          gun.get('profiles').get(username).put({ role: 'عضو', bio: '', color: '#fff', bg: '#36393f', suspended: false });
+          checkOwnerAndChat(username);
+        }
+      });
     });
   } else {
-    // ورود
     user.auth(username, password, (ack) => {
       btn.disabled = false;
-      if (ack.err) {
-        status.textContent = '❌ ' + ack.err;
-      } else {
-        showChat();
-      }
+      if (ack.err) return status.textContent = '❌ ' + ack.err;
+      checkSuspended(username).then(s => {
+        if (s) { user.leave(); return status.textContent = '⛔ اکانت شما تعلیق شده!'; }
+        checkOwnerAndChat(username);
+      });
     });
   }
 }
 
-// ================== نمایش چت ==================
-function showChat() {
-  document.getElementById('authPage').style.display = 'none';
-  document.getElementById('chatPage').style.display = 'block';
-  loadMessages();
-
-  // گوش دادن به پیام‌های جدید
-  gun.get('public-chat').map().on((msg, id) => {
-    if (!msg || !msg.text) return;
-    renderMessage(msg);
+function checkOwnerAndChat(username) {
+  gun.get('owner').once((data) => {
+    if (!data || !data.name) {
+      gun.get('owner').put({ name: username });
+      gun.get('profiles').get(username).put({ role: 'اونر' });
+    }
+    showChat();
   });
 }
 
-// ================== ارسال پیام ==================
+function checkSuspended(username) {
+  return new Promise((resolve) => {
+    gun.get('profiles').get(username).once((data) => resolve(data?.suspended || false));
+  });
+}
+
+function showChat() {
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('chatPage').style.display = 'block';
+  loadChannels(); loadMessages(); loadUsers(); loadBackground(); renderAdminPanel(); checkVerifyPermission(); setOnline(true);
+  gun.get('public-chat').map().on((msg) => {
+    if (!msg || !msg.text) return;
+    if (msg.channel !== currentChannel) return;
+    renderMessage(msg);
+  });
+  gun.get('online-users').map().on(() => renderUserList());
+}
+
+function loadChannels() {
+  const list = document.getElementById('channelList');
+  list.innerHTML = '<div class="channel active" data-name="عمومی" onclick="switchChannel(this, \'عمومی\')"><span>عمومی</span></div>';
+  gun.get('channels').map().on((ch, id) => {
+    if (!ch || !ch.name) return;
+    const exists = document.querySelector(`.channel[data-name="${ch.name}"]`);
+    if (exists) {
+      const tick = exists.querySelector('.channel-tick');
+      if (ch.verified && !tick) {
+        const img = document.createElement('img'); img.src = BLUE_TICK; img.className = 'channel-tick'; exists.appendChild(img);
+      } else if (!ch.verified && tick) tick.remove();
+      return;
+    }
+    const div = document.createElement('div');
+    div.className = 'channel'; div.dataset.name = ch.name;
+    if (ch.verified) { const img = document.createElement('img'); img.src = BLUE_TICK; img.className = 'channel-tick'; div.appendChild(img); }
+    const span = document.createElement('span'); span.textContent = ch.name; div.appendChild(span);
+    div.onclick = () => switchChannel(div, ch.name);
+    list.appendChild(div);
+  });
+}
+
+function switchChannel(el, name) {
+  document.querySelectorAll('.channel').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  currentChannel = name;
+  document.getElementById('channelTitle').textContent = name;
+  document.getElementById('messages').innerHTML = '';
+  renderedIds.clear();
+  loadMessages(); checkVerifyPermission();
+}
+
+function openCreateChannel() { document.getElementById('createChannelModal').classList.add('open'); }
+function closeCreateChannel(e) { if (e && e.target !== e.currentTarget && e.type === 'click') return; document.getElementById('createChannelModal').classList.remove('open'); }
+function createChannel() {
+  const name = document.getElementById('newChannelName').value.trim();
+  if (!name) return alert('اسم کانال رو بنویس!');
+  gun.get('channels').set({ name, creator: user.is.alias, time: Date.now(), verified: false });
+  document.getElementById('newChannelName').value = '';
+  closeCreateChannel();
+}
+
+function checkVerifyPermission() {
+  isOwner((owner) => {
+    const btn = document.getElementById('verifyBtn');
+    btn.style.display = owner ? 'block' : 'none';
+    gun.get('channels').map().once((ch) => { if (ch && ch.name === currentChannel) btn.classList.toggle('active', ch.verified); });
+  });
+}
+
+function toggleChannelVerify() {
+  gun.get('channels').map().once((ch, id) => {
+    if (ch && ch.name === currentChannel) {
+      gun.get('channels').get(id).put({ verified: !ch.verified });
+      checkVerifyPermission();
+    }
+  });
+}
+
+function insertFormat(marker) {
+  const input = document.getElementById('msgInput');
+  const start = input.selectionStart, end = input.selectionEnd;
+  const text = input.value;
+  input.value = text.slice(0, start) + marker + text.slice(start, end) + marker + text.slice(end);
+  input.focus();
+  input.selectionStart = input.selectionEnd = end + marker.length * 2;
+}
+
 function sendMsg() {
   const input = document.getElementById('msgInput');
   const text = input.value.trim();
   if (!text) return;
-
-  const username = user.is.alias || 'ناشناس';
-
-  // ذخیره در GunDB
-  gun.get('public-chat').set({
-    user: username,
-    text: text,
-    time: Date.now()
-  });
-
+  gun.get('public-chat').set({ user: user.is.alias || 'ناشناس', text, time: Date.now(), channel: currentChannel });
   input.value = '';
 }
-
-// ================== نمایش پیام ==================
-let renderedIds = new Set();
 
 function renderMessage(msg) {
   const box = document.getElementById('messages');
   const key = msg.time + '_' + msg.user;
-
   if (renderedIds.has(key)) return;
   renderedIds.add(key);
-
-  const div = document.createElement('div');
-  div.className = 'message';
-  div.innerHTML = `
-    <span class="user">${msg.user}</span>
-    <span style="color:#72767d;font-size:12px;margin-right:8px;">
-      ${new Date(msg.time).toLocaleTimeString('fa-IR')}
-    </span>
-    <div>${escapeHtml(msg.text)}</div>
-  `;
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
+  gun.get('profiles').get(msg.user).once((data) => {
+    const color = data?.color || '#fff';
+    const div = document.createElement('div');
+    div.className = 'message';
+    div.innerHTML = `
+      <div class="avatar" onclick="openProfile('${msg.user}')">${msg.user[0].toUpperCase()}</div>
+      <div class="msg-content">
+        <div class="msg-header">
+          <span class="username" style="color:${color}" onclick="openProfile('${msg.user}')">${msg.user}</span>
+          <span class="timestamp">${new Date(msg.time).toLocaleTimeString('fa-IR')}</span>
+        </div>
+        <div class="msg-text">${formatText(msg.text)}</div>
+      </div>`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  });
 }
 
-// ================== بارگذاری پیام‌های قبلی ==================
-function loadMessages() {
-  document.getElementById('messages').innerHTML = '';
-  renderedIds.clear();
+function formatText(text) {
+  let t = escapeHtml(text);
+  t = t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  t = t.replace(/\*(.+?)\*/g, '<i>$1</i>');
+  t = t.replace(/\|\|(.+?)\|\|/g, '<span class="spoiler" onclick="this.classList.toggle(\'show\')">$1</span>');
+  return t;
 }
 
-// ================== خروج ==================
-function logout() {
+function loadMessages() { document.getElementById('messages').innerHTML = ''; renderedIds.clear(); }
+
+function setOnline(status) {
+  const me = user.is.alias;
+  if (!me) return;
+  gun.get('online-users').get(me).put({ name: me, online: status, time: Date.now() });
+}
+
+function loadUsers() { gun.get('online-users').map().on(() => renderUserList()); }
+
+function renderUserList() {
+  const list = document.getElementById('userList');
+  const users = [];
+  gun.get('online-users').map().once((u) => { if (u && u.name && !users.find(x => x.name === u.name)) users.push(u); });
+  setTimeout(() => {
+    const online = users.filter(u => u.online);
+    document.getElementById('onlineCount').textContent = online.length;
+    document.getElementById('onlineHeader').textContent = `🟢 ${online.length} آنلاین`;
+    list.innerHTML = '';
+    users.forEach(u => {
+      gun.get('profiles').get(u.name).once((p) => {
+        const role = p?.role || 'عضو';
+        let tag = '';
+        if (role === 'اونر') tag = '<span class="tag tag-owner">👑</span>';
+        else if (role === 'ادمین') tag = '<span class="tag tag-admin">🛡️</span>';
+        const item = document.createElement('div');
+        item.className = 'user-item';
+        item.onclick = () => openProfile(u.name);
+        item.innerHTML = `<div class="status ${u.online ? '' : 'offline'}"></div><span style="color:${p?.color || '#b9bbbe'}">${u.name}</span>${tag}`;
+        list.appendChild(item);
+      });
+    });
+  }, 500);
+}
+
+function isOwner(callback) { gun.get('owner').once((data) => callback(data && data.name === user.is.alias)); }
+
+function renderAdminPanel() {
+  isOwner((owner) => {
+    if (!owner) { document.getElementById('adminPanel').style.display = 'none'; return; }
+    document.getElementById('adminPanel').style.display = 'block';
+    const list = document.getElementById('adminList');
+    list.innerHTML = '';
+    gun.get('profiles').map().once((data, username) => {
+      if (!data || !username) return;
+      const role = data.role || 'عضو';
+      const row = document.createElement('div');
+      row.className = 'admin-row';
+      row.innerHTML = `
+        <span>${username}</span>
+        <select onchange="setRole('${username}', this.value)">
+          <option value="عضو" ${role === 'عضو' ? 'selected' : ''}>عضو</option>
+          <option value="ادمین" ${role === 'ادمین' ? 'selected' : ''}>ادمین</option>
+          <option value="اونر" ${role === 'اونر' ? 'selected' : ''}>اونر</option>
+        </select>
+        <button class="del-btn" onclick="suspendUser('${username}')">⛔</button>`;
+      list.appendChild(row);
+    });
+  });
+}
+
+function setRole(username, role) { isOwner((o) => { if (!o) return alert('فقط اونر!'); gun.get('profiles').get(username).put({ role }); }); }
+function suspendUser(username) {
+  isOwner((o) => {
+    if (!o) return alert('فقط اونر!');
+    gun.get('profiles').get(username).once((d) => {
+      gun.get('profiles').get(username).put({ suspended: !d?.suspended });
+      alert((!d?.suspended) ? '⛔ تعلیق شد' : '✅ آزاد شد');
+    });
+  });
+}
+
+function openProfile(username) {
+  currentProfileUser = username;
+  document.getElementById('profileAvatar').textContent = username[0].toUpperCase();
+  gun.get('profiles').get(username).once((data) => {
+    document.getElementById('profileName').textContent = username;
+    document.getElementById('profileName').style.color = data?.color || '#fff';
+    document.getElementById('profileRole').textContent = data?.role || 'عضو';
+    document.getElementById('profileBio').textContent = data?.bio || 'بیو نداره';
+  });
+  document.getElementById('profileModal').classList.add('open');
+}
+function closeProfile(e) { if (e && e.target !== e.currentTarget && e.type === 'click') return; document.getElementById('profileModal').classList.remove('open'); }
+function openSettings() {
+  if (!currentProfileUser) return;
+  gun.get('profiles').get(currentProfileUser).once((d) => {
+    document.getElementById('bioInput').value = d?.bio || '';
+    document.getElementById('colorSelect').value = d?.color || '#fff';
+    document.getElementById('bgSelect').value = d?.bg || '#36393f';
+  });
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(e) { if (e && e.target !== e.currentTarget && e.type === 'click') return; document.getElementById('settingsModal').classList.remove('open'); }
+function saveProfile() {
+  const bio = document.getElementById('bioInput').value.trim();
+  const color = document.getElementById('colorSelect').value;
+  const bg = document.getElementById('bgSelect').value;
+  gun.get('profiles').get(user.is.alias).put({ bio, color, bg });
+  document.getElementById('chatArea').style.background = bg;
+  alert('✅ ذخیره شد!');
+  closeSettings();
+}
+function loadBackground() {
+  gun.get('profiles').get(user.is.alias).once((d) => { if (d?.bg) document.getElementById('chatArea').style.background = d.bg; });
+}
+function deleteAccount() {
+  if (!confirm('مطمئنی می‌خوای اکانتت حذف شه؟')) return;
+  gun.get('profiles').get(user.is.alias).put({ suspended: true, deleted: true });
   user.leave();
   location.reload();
 }
 
-// ================== ابزار ==================
-function escapeHtml(t) {
-  const d = document.createElement('div');
-  d.textContent = t;
-  return d.innerHTML;
-}
+function logout() { setOnline(false); user.leave(); location.reload(); }
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-// ================== بررسی ورود خودکار ==================
-user.recall({ sessionStorage: true }, () => {
-  if (user.is) {
-    showChat();
-  }
-});
+user.recall({ sessionStorage: true }, () => { if (user.is) showChat(); });
 </script>
 </body>
 </html>
